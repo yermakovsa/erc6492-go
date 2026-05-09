@@ -54,6 +54,10 @@ func VerifyERC6492(
 			return Result{}, ErrMissingERC6492Factory
 		}
 
+		if cfg.erc6492Factory == (common.Address{}) {
+			return Result{}, ErrZeroERC6492FactoryAddress
+		}
+
 		wrapped, err := WrapERC6492(cfg.erc6492Factory, cfg.erc6492FactoryData, signature)
 		if err != nil {
 			return Result{}, err
@@ -66,9 +70,13 @@ func VerifyERC6492(
 		return Result{}, ErrDeploylessVerifierMissing
 	}
 
+	if cfg.erc6492VerifierAddress == (common.Address{}) {
+		return Result{}, ErrZeroERC6492VerifierAddress
+	}
+
 	input, err := encodeERC6492VerifierCall(signer, hash, wrappedSignature)
 	if err != nil {
-		return Result{}, fmt.Errorf("%w: encode erc6492 verifier calldata: %v", ErrInvalidABIOutput, err)
+		return Result{}, fmt.Errorf("%w: encode erc6492 verifier calldata: %v", ErrInvalidABIInput, err)
 	}
 
 	call := ethereum.CallMsg{

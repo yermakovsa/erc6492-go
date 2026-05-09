@@ -36,7 +36,7 @@ func VerifyEIP1271(
 
 	input, err := encodeEIP1271Call(hash, signature)
 	if err != nil {
-		return Result{}, fmt.Errorf("%w: encode eip1271 calldata: %v", ErrInvalidABIOutput, err)
+		return Result{}, fmt.Errorf("%w: encode eip1271 calldata: %v", ErrInvalidABIInput, err)
 	}
 
 	call := ethereum.CallMsg{

@@ -1,6 +1,7 @@
 package erc6492
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"math/big"
@@ -137,6 +138,72 @@ func TestVerifyWithERC6492FactoryRoutesBeforeCodeAt(t *testing.T) {
 	}
 }
 
+func TestVerifyWithERC6492FactoryAndAlreadyWrappedSignatureDoesNotDoubleWrap(t *testing.T) {
+	ctx := context.Background()
+	signer := common.HexToAddress("0x1414141414141414141414141414141414141414")
+	hash := common.HexToHash("0x1515151515151515151515151515151515151515151515151515151515151515")
+	verifier := common.HexToAddress("0x1616161616161616161616161616161616161616")
+
+	originalFactory := common.HexToAddress("0x1717171717171717171717171717171717171717")
+	originalFactoryData := []byte{0x01, 0x02, 0x03}
+	innerSignature := []byte{0x04, 0x05, 0x06}
+
+	wrapped, err := WrapERC6492(originalFactory, originalFactoryData, innerSignature)
+	if err != nil {
+		t.Fatalf("WrapERC6492 returned error: %v", err)
+	}
+
+	unusedFactory := common.HexToAddress("0x1818181818181818181818181818181818181818")
+	unusedFactoryData := []byte{0xaa, 0xbb, 0xcc}
+
+	caller := &recordingUniversalCaller{
+		codeErr:    errors.New("CodeAt should not be called"),
+		callOutput: mustPackERC6492VerifierBool(t, true),
+	}
+
+	result, err := Verify(
+		ctx,
+		caller,
+		signer,
+		hash,
+		wrapped,
+		WithERC6492Factory(unusedFactory, unusedFactoryData),
+		WithERC6492VerifierAddress(verifier),
+	)
+	assertNoError(t, err)
+	assertResult(t, result, true, MethodERC6492)
+
+	if caller.codeCalls != 0 {
+		t.Fatalf("expected CodeAt not to be called, got %d calls", caller.codeCalls)
+	}
+
+	if caller.callCalls != 1 {
+		t.Fatalf("expected 1 verifier call, got %d", caller.callCalls)
+	}
+
+	_, _, verifierSignature := mustUnpackERC6492VerifierCallArgs(t, caller.call.Data[4:])
+	if !bytes.Equal(verifierSignature, wrapped) {
+		t.Fatalf("verifier received signature = %x, want original wrapped signature %x", verifierSignature, wrapped)
+	}
+
+	decoded, err := UnwrapERC6492(verifierSignature)
+	if err != nil {
+		t.Fatalf("UnwrapERC6492 returned error: %v", err)
+	}
+
+	if decoded.Factory != originalFactory {
+		t.Fatalf("wrapped factory = %s, want original factory %s", decoded.Factory.Hex(), originalFactory.Hex())
+	}
+
+	if !bytes.Equal(decoded.FactoryData, originalFactoryData) {
+		t.Fatalf("wrapped factory data = %x, want original factory data %x", decoded.FactoryData, originalFactoryData)
+	}
+
+	if !bytes.Equal(decoded.Signature, innerSignature) {
+		t.Fatalf("wrapped inner signature = %x, want original inner signature %x", decoded.Signature, innerSignature)
+	}
+}
+
 func TestVerifyERC6492VerifierFalseIsFinal(t *testing.T) {
 	ctx := context.Background()
 	signer := common.HexToAddress("0x7777777777777777777777777777777777777777")
@@ -181,6 +248,29 @@ func TestVerifyMalformedWrappedERC6492ErrorsBeforeCodeAt(t *testing.T) {
 	}
 
 	result, err := Verify(ctx, caller, signer, hash, malformed)
+	assertErrorIs(t, err, ErrMalformedERC6492Signature)
+	assertZeroResult(t, result)
+
+	if caller.codeCalls != 0 {
+		t.Fatalf("expected CodeAt not to be called, got %d calls", caller.codeCalls)
+	}
+
+	if caller.callCalls != 0 {
+		t.Fatalf("expected verifier not to be called, got %d calls", caller.callCalls)
+	}
+}
+
+func TestVerifySuffixOnlyERC6492SignatureErrorsBeforeCodeAt(t *testing.T) {
+	ctx := context.Background()
+	signer := common.HexToAddress("0x1919191919191919191919191919191919191919")
+	hash := common.HexToHash("0x2020202020202020202020202020202020202020202020202020202020202020")
+	signature := append([]byte(nil), erc6492MagicSuffix[:]...)
+
+	caller := &recordingUniversalCaller{
+		codeErr: errors.New("CodeAt should not be called"),
+	}
+
+	result, err := Verify(ctx, caller, signer, hash, signature)
 	assertErrorIs(t, err, ErrMalformedERC6492Signature)
 	assertZeroResult(t, result)
 
