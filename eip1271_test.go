@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/vm"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 func TestVerifyEIP1271ValidMagicValue(t *testing.T) {
@@ -297,6 +298,22 @@ func TestVerifyEIP1271WithFrom(t *testing.T) {
 
 	if caller.call.From != from {
 		t.Fatalf("call From = %s, want %s", caller.call.From.Hex(), from.Hex())
+	}
+}
+
+func TestEIP1271SelectorAndMagicValue(t *testing.T) {
+	selector := crypto.Keccak256([]byte("isValidSignature(bytes32,bytes)"))[:4]
+
+	if !bytes.Equal(selector, eip1271IsValidSignatureSelector[:]) {
+		t.Fatalf(
+			"eip1271 selector = 0x%x, want 0x%x",
+			eip1271IsValidSignatureSelector,
+			selector,
+		)
+	}
+
+	if !bytes.Equal(selector, eip1271MagicValue[:]) {
+		t.Fatalf("eip1271 magic value = 0x%x, want selector 0x%x", eip1271MagicValue, selector)
 	}
 }
 

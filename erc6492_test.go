@@ -206,6 +206,10 @@ func TestUnwrapERC6492MalformedSignatures(t *testing.T) {
 			signature: []byte("missing suffix"),
 		},
 		{
+			name:      "suffix only",
+			signature: append([]byte(nil), erc6492MagicSuffix[:]...),
+		},
+		{
 			name:      "malformed abi with suffix",
 			signature: append([]byte("not valid abi"), erc6492MagicSuffix[:]...),
 		},
@@ -323,6 +327,34 @@ func TestVerifyERC6492UnwrappedWithoutFactory(t *testing.T) {
 	}
 }
 
+func TestVerifyERC6492UnwrappedWithZeroFactoryAddress(t *testing.T) {
+	caller := &recordingERC6492Caller{
+		output: mustPackERC6492VerifierBool(t, true),
+	}
+
+	result, err := VerifyERC6492(
+		context.Background(),
+		caller,
+		common.HexToAddress("0x3333333333333333333333333333333333333333"),
+		common.HexToHash("0xabababababababababababababababababababababababababababababababab"),
+		[]byte{0x01, 0x02, 0x03},
+		WithERC6492Factory(common.Address{}, []byte{0x04, 0x05}),
+		WithERC6492VerifierAddress(common.HexToAddress("0x4444444444444444444444444444444444444444")),
+	)
+
+	if !errors.Is(err, ErrZeroERC6492FactoryAddress) {
+		t.Fatalf("VerifyERC6492 error = %v, want ErrZeroERC6492FactoryAddress", err)
+	}
+
+	if result != (Result{}) {
+		t.Fatalf("expected zero result on error, got %+v", result)
+	}
+
+	if caller.calls != 0 {
+		t.Fatalf("expected verifier not to be called, got %d calls", caller.calls)
+	}
+}
+
 func TestVerifyERC6492MalformedWrappedSignature(t *testing.T) {
 	caller := &recordingERC6492Caller{
 		output: mustPackERC6492VerifierBool(t, true),
@@ -341,6 +373,42 @@ func TestVerifyERC6492MalformedWrappedSignature(t *testing.T) {
 
 	if !errors.Is(err, ErrMalformedERC6492Signature) {
 		t.Fatalf("VerifyERC6492 error = %v, want ErrMalformedERC6492Signature", err)
+	}
+
+	if result != (Result{}) {
+		t.Fatalf("expected zero result on error, got %+v", result)
+	}
+
+	if caller.calls != 0 {
+		t.Fatalf("expected verifier not to be called, got %d calls", caller.calls)
+	}
+}
+
+func TestVerifyERC6492ZeroVerifierAddress(t *testing.T) {
+	wrapped, err := WrapERC6492(
+		common.HexToAddress("0x6666666666666666666666666666666666666666"),
+		[]byte{0x01},
+		[]byte{0x02},
+	)
+	if err != nil {
+		t.Fatalf("WrapERC6492 returned error: %v", err)
+	}
+
+	caller := &recordingERC6492Caller{
+		output: mustPackERC6492VerifierBool(t, true),
+	}
+
+	result, err := VerifyERC6492(
+		context.Background(),
+		caller,
+		common.HexToAddress("0x7777777777777777777777777777777777777777"),
+		common.HexToHash("0xcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"),
+		wrapped,
+		WithERC6492VerifierAddress(common.Address{}),
+	)
+
+	if !errors.Is(err, ErrZeroERC6492VerifierAddress) {
+		t.Fatalf("VerifyERC6492 error = %v, want ErrZeroERC6492VerifierAddress", err)
 	}
 
 	if result != (Result{}) {
