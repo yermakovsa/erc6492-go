@@ -14,18 +14,18 @@ The package does not construct messages or hashes, manage RPC clients, send tran
 
 ## Status
 
-Pre-release. The API may change before the first tag.
+Initial pre-release. The API may change before v1.0.0.
 
-Pin a commit if you use this before a release:
-
-```bash
-go get github.com/yermakovsa/erc6492-go@<commit>
-```
-
-After a tagged release is available:
+Install the latest tagged release:
 
 ```bash
 go get github.com/yermakovsa/erc6492-go@v0.1.0
+````
+
+Pin a commit if you need an unreleased change:
+
+```bash
+go get github.com/yermakovsa/erc6492-go@<commit>
 ```
 
 ## API shape
@@ -181,6 +181,15 @@ if result.Valid {
 	// ERC-6492 signature is valid
 }
 ```
+
+## Examples
+
+Runnable examples are available in [`examples`](examples).
+
+- [`examples/eoa`](examples/eoa) verifies a known EOA signature locally.
+- [`examples/eip1271`](examples/eip1271) verifies a known EIP-1271 signature against a fixture contract on Sepolia.
+
+The examples use caller-supplied final hashes. They do not build messages, hash typed data, send transactions, or deploy contracts.
 
 ## Testing
 
